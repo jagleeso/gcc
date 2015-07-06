@@ -64,6 +64,12 @@
 #include "tree-vectorizer.h"
 #include "config/arm/aarch-cost-tables.h"
 
+#define CONFIG_RKP_HYPERDRIVE_REARRANGE_PROLOGUE
+/* Arbitrary constant to make prologue_store_pair and store_pair match constraints differ.
+ * (otherwise build system barks at us).
+ */
+#define MATCH_PROLOGUE 1337
+
 /* Defined for convenience.  */
 #define POINTER_BYTES (POINTER_SIZE / BITS_PER_UNIT)
 
@@ -2024,172 +2030,197 @@ aarch64_save_or_restore_callee_save_registers (HOST_WIDE_INT offset,
 void
 aarch64_expand_prologue (void)
 {
-  /* sub sp, sp, #<frame_size>
-     stp {fp, lr}, [sp, #<frame_size> - 16]
-     add fp, sp, #<frame_size> - hardfp_offset
-     stp {cs_reg}, [fp, #-16] etc.
+    /* sub sp, sp, #<frame_size>
+       stp {fp, lr}, [sp, #<frame_size> - 16]
+       add fp, sp, #<frame_size> - hardfp_offset
+       stp {cs_reg}, [fp, #-16] etc.
 
-     sub sp, sp, <final_adjustment_if_any>
-  */
-  HOST_WIDE_INT original_frame_size;	/* local variables + vararg save */
-  HOST_WIDE_INT frame_size, offset;
-  HOST_WIDE_INT fp_offset;		/* FP offset from SP */
-  rtx insn;
+       sub sp, sp, <final_adjustment_if_any>
+       */
+    HOST_WIDE_INT original_frame_size;    /* local variables + vararg save */
+    HOST_WIDE_INT frame_size, offset;
+    HOST_WIDE_INT fp_offset;        /* FP offset from SP */
+    rtx insn;
 
-  aarch64_layout_frame ();
-  original_frame_size = get_frame_size () + cfun->machine->saved_varargs_size;
-  gcc_assert ((!cfun->machine->saved_varargs_size || cfun->stdarg)
-	      && (cfun->stdarg || !cfun->machine->saved_varargs_size));
-  frame_size = (original_frame_size + cfun->machine->frame.saved_regs_size
-		+ crtl->outgoing_args_size);
-  offset = frame_size = AARCH64_ROUND_UP (frame_size,
-					  STACK_BOUNDARY / BITS_PER_UNIT);
+    aarch64_layout_frame ();
+    original_frame_size = get_frame_size () + cfun->machine->saved_varargs_size;
+    gcc_assert ((!cfun->machine->saved_varargs_size || cfun->stdarg)
+            && (cfun->stdarg || !cfun->machine->saved_varargs_size));
+    frame_size = (original_frame_size + cfun->machine->frame.saved_regs_size
+            + crtl->outgoing_args_size);
+    offset = frame_size = AARCH64_ROUND_UP (frame_size,
+            STACK_BOUNDARY / BITS_PER_UNIT);
 
-  if (flag_stack_usage_info)
-    current_function_static_stack_size = frame_size;
+    if (flag_stack_usage_info)
+        current_function_static_stack_size = frame_size;
 
-  fp_offset = (offset
-	       - original_frame_size
-	       - cfun->machine->frame.saved_regs_size);
+    fp_offset = (offset
+            - original_frame_size
+            - cfun->machine->frame.saved_regs_size);
 
-  /* Store pairs and load pairs have a range only -512 to 504.  */
-  if (offset >= 512)
+    /* Store pairs and load pairs have a range only -512 to 504.  */
+    if (offset >= 512)
     {
-      /* When the frame has a large size, an initial decrease is done on
-	 the stack pointer to jump over the callee-allocated save area for
-	 register varargs, the local variable area and/or the callee-saved
-	 register area.  This will allow the pre-index write-back
-	 store pair instructions to be used for setting up the stack frame
-	 efficiently.  */
-      offset = original_frame_size + cfun->machine->frame.saved_regs_size;
-      if (offset >= 512)
-	offset = cfun->machine->frame.saved_regs_size;
+        /* When the frame has a large size, an initial decrease is done on
+           the stack pointer to jump over the callee-allocated save area for
+           register varargs, the local variable area and/or the callee-saved
+           register area.  This will allow the pre-index write-back
+           store pair instructions to be used for setting up the stack frame
+           efficiently.  */
+        offset = original_frame_size + cfun->machine->frame.saved_regs_size;
+        if (offset >= 512)
+            offset = cfun->machine->frame.saved_regs_size;
 
-      frame_size -= (offset + crtl->outgoing_args_size);
-      fp_offset = 0;
+        frame_size -= (offset + crtl->outgoing_args_size);
+        fp_offset = 0;
 
-      if (frame_size >= 0x1000000)
-	{
-	  rtx op0 = gen_rtx_REG (Pmode, IP0_REGNUM);
-	  emit_move_insn (op0, GEN_INT (-frame_size));
-	  emit_insn (gen_add2_insn (stack_pointer_rtx, op0));
-	  aarch64_set_frame_expr (gen_rtx_SET
-				  (Pmode, stack_pointer_rtx,
-				   plus_constant (Pmode,
-						  stack_pointer_rtx,
-						  -frame_size)));
-	}
-      else if (frame_size > 0)
-	{
-	  if ((frame_size & 0xfff) != frame_size)
-	    {
-	      insn = emit_insn (gen_add2_insn
-				(stack_pointer_rtx,
-				 GEN_INT (-(frame_size
-					    & ~(HOST_WIDE_INT)0xfff))));
-	      RTX_FRAME_RELATED_P (insn) = 1;
-	    }
-	  if ((frame_size & 0xfff) != 0)
-	    {
-	      insn = emit_insn (gen_add2_insn
-				(stack_pointer_rtx,
-				 GEN_INT (-(frame_size
-					    & (HOST_WIDE_INT)0xfff))));
-	      RTX_FRAME_RELATED_P (insn) = 1;
-	    }
-	}
+        if (frame_size >= 0x1000000)
+        {
+            rtx op0 = gen_rtx_REG (Pmode, IP0_REGNUM);
+            emit_move_insn (op0, GEN_INT (-frame_size));
+            emit_insn (gen_add2_insn (stack_pointer_rtx, op0));
+            aarch64_set_frame_expr (gen_rtx_SET
+                    (Pmode, stack_pointer_rtx,
+                     plus_constant (Pmode,
+                         stack_pointer_rtx,
+                         -frame_size)));
+        }
+        else if (frame_size > 0)
+        {
+            if ((frame_size & 0xfff) != frame_size)
+            {
+                insn = emit_insn (gen_add2_insn
+                        (stack_pointer_rtx,
+                         GEN_INT (-(frame_size
+                                 & ~(HOST_WIDE_INT)0xfff))));
+                RTX_FRAME_RELATED_P (insn) = 1;
+            }
+            if ((frame_size & 0xfff) != 0)
+            {
+                insn = emit_insn (gen_add2_insn
+                        (stack_pointer_rtx,
+                         GEN_INT (-(frame_size
+                                 & (HOST_WIDE_INT)0xfff))));
+                RTX_FRAME_RELATED_P (insn) = 1;
+            }
+        }
     }
-  else
-    frame_size = -1;
+    else
+        frame_size = -1;
 
-  if (offset > 0)
+    if (offset > 0)
     {
-      /* Save the frame pointer and lr if the frame pointer is needed
-	 first.  Make the frame pointer point to the location of the
-	 old frame pointer on the stack.  */
-      if (frame_pointer_needed)
-	{
-	  rtx mem_fp, mem_lr;
+        /* Save the frame pointer and lr if the frame pointer is needed
+           first.  Make the frame pointer point to the location of the
+           old frame pointer on the stack.  */
+        if (frame_pointer_needed)
+        {
+            rtx mem_fp, mem_lr;
 
-	  if (fp_offset)
-	    {
-	      insn = emit_insn (gen_add2_insn (stack_pointer_rtx,
-					       GEN_INT (-offset)));
-	      RTX_FRAME_RELATED_P (insn) = 1;
-	      aarch64_set_frame_expr (gen_rtx_SET
-				      (Pmode, stack_pointer_rtx,
-				       gen_rtx_MINUS (Pmode,
-						      stack_pointer_rtx,
-						      GEN_INT (offset))));
-	      mem_fp = gen_frame_mem (DImode,
-				      plus_constant (Pmode,
-						     stack_pointer_rtx,
-						     fp_offset));
-	      mem_lr = gen_frame_mem (DImode,
-				      plus_constant (Pmode,
-						     stack_pointer_rtx,
-						     fp_offset
-						     + UNITS_PER_WORD));
-	      insn = emit_insn (gen_store_pairdi (mem_fp,
-						  hard_frame_pointer_rtx,
-						  mem_lr,
-						  gen_rtx_REG (DImode,
-							       LR_REGNUM)));
-	    }
-	  else
-	    {
-	      insn = emit_insn (gen_storewb_pairdi_di
-				(stack_pointer_rtx, stack_pointer_rtx,
-				 hard_frame_pointer_rtx,
-				 gen_rtx_REG (DImode, LR_REGNUM),
-				 GEN_INT (-offset),
-				 GEN_INT (GET_MODE_SIZE (DImode) - offset)));
-	      RTX_FRAME_RELATED_P (XVECEXP (PATTERN (insn), 0, 2)) = 1;
-	    }
+            if (fp_offset)
+            {
+                insn = emit_insn (gen_add2_insn (stack_pointer_rtx,
+                            GEN_INT (-offset)));
+                RTX_FRAME_RELATED_P (insn) = 1;
+                aarch64_set_frame_expr (gen_rtx_SET
+                        (Pmode, stack_pointer_rtx,
+                         gen_rtx_MINUS (Pmode,
+                             stack_pointer_rtx,
+                             GEN_INT (offset))));
+                mem_fp = gen_frame_mem (DImode,
+                        plus_constant (Pmode,
+                            stack_pointer_rtx,
+                            fp_offset));
+                mem_lr = gen_frame_mem (DImode,
+                        plus_constant (Pmode,
+                            stack_pointer_rtx,
+                            fp_offset
+                            + UNITS_PER_WORD));
+/* #ifdef CONFIG_RKP_HYPERDRIVE_REARRANGE_PROLOGUE */
+/*                 insn = emit_insn (gen_nop()); */
+/* #endif */
+#ifdef CONFIG_RKP_HYPERDRIVE_REARRANGE_PROLOGUE
+                insn = emit_insn (gen_prologue_store_pairdi (mem_fp,
+                            hard_frame_pointer_rtx,
+                            mem_lr,
+                            gen_rtx_REG (DImode,
+                                LR_REGNUM),
+                            GEN_INT (1337)));
+#else
+                insn = emit_insn (gen_store_pairdi (mem_fp,
+                            hard_frame_pointer_rtx,
+                            mem_lr,
+                            gen_rtx_REG (DImode,
+                                LR_REGNUM)));
+#endif
+            }
+            else
+            {
+/* #ifdef CONFIG_RKP_HYPERDRIVE_REARRANGE_PROLOGUE */
+/*                 insn = emit_insn (gen_nop()); */
+/* #endif */
+#ifdef CONFIG_RKP_HYPERDRIVE_REARRANGE_PROLOGUE
+                insn = emit_insn (gen_prologue_storewb_pairdi_di
+                        (stack_pointer_rtx, stack_pointer_rtx,
+                         hard_frame_pointer_rtx,
+                         gen_rtx_REG (DImode, LR_REGNUM),
+                         GEN_INT (-offset),
+                         GEN_INT (GET_MODE_SIZE (DImode) - offset),
+                         GEN_INT (1337)));
+#else
+                insn = emit_insn (gen_storewb_pairdi_di
+                        (stack_pointer_rtx, stack_pointer_rtx,
+                         hard_frame_pointer_rtx,
+                         gen_rtx_REG (DImode, LR_REGNUM),
+                         GEN_INT (-offset),
+                         GEN_INT (GET_MODE_SIZE (DImode) - offset)));
+#endif
+                RTX_FRAME_RELATED_P (XVECEXP (PATTERN (insn), 0, 2)) = 1;
+            }
 
-	  /* The first part of a frame-related parallel insn is always
-	     assumed to be relevant to the frame calculations;
-	     subsequent parts, are only frame-related if explicitly
-	     marked.  */
-	  RTX_FRAME_RELATED_P (XVECEXP (PATTERN (insn), 0, 1)) = 1;
-	  RTX_FRAME_RELATED_P (insn) = 1;
+            /* The first part of a frame-related parallel insn is always
+               assumed to be relevant to the frame calculations;
+               subsequent parts, are only frame-related if explicitly
+               marked.  */
+            RTX_FRAME_RELATED_P (XVECEXP (PATTERN (insn), 0, 1)) = 1;
+            RTX_FRAME_RELATED_P (insn) = 1;
 
-	  /* Set up frame pointer to point to the location of the
-	     previous frame pointer on the stack.  */
-	  insn = emit_insn (gen_add3_insn (hard_frame_pointer_rtx,
-					   stack_pointer_rtx,
-					   GEN_INT (fp_offset)));
-	  aarch64_set_frame_expr (gen_rtx_SET
-				  (Pmode, hard_frame_pointer_rtx,
-				   plus_constant (Pmode,
-						  stack_pointer_rtx,
-						  fp_offset)));
-	  RTX_FRAME_RELATED_P (insn) = 1;
-	  insn = emit_insn (gen_stack_tie (stack_pointer_rtx,
-					   hard_frame_pointer_rtx));
-	}
-      else
-	{
-	  insn = emit_insn (gen_add2_insn (stack_pointer_rtx,
-					   GEN_INT (-offset)));
-	  RTX_FRAME_RELATED_P (insn) = 1;
-	}
+            /* Set up frame pointer to point to the location of the
+               previous frame pointer on the stack.  */
+            insn = emit_insn (gen_add3_insn (hard_frame_pointer_rtx,
+                        stack_pointer_rtx,
+                        GEN_INT (fp_offset)));
+            aarch64_set_frame_expr (gen_rtx_SET
+                    (Pmode, hard_frame_pointer_rtx,
+                     plus_constant (Pmode,
+                         stack_pointer_rtx,
+                         fp_offset)));
+            RTX_FRAME_RELATED_P (insn) = 1;
+            insn = emit_insn (gen_stack_tie (stack_pointer_rtx,
+                        hard_frame_pointer_rtx));
+        }
+        else
+        {
+            insn = emit_insn (gen_add2_insn (stack_pointer_rtx,
+                        GEN_INT (-offset)));
+            RTX_FRAME_RELATED_P (insn) = 1;
+        }
 
-      aarch64_save_or_restore_callee_save_registers
-	(fp_offset + cfun->machine->frame.hardfp_offset, 0);
+        aarch64_save_or_restore_callee_save_registers
+            (fp_offset + cfun->machine->frame.hardfp_offset, 0);
     }
 
-  /* when offset >= 512,
-     sub sp, sp, #<outgoing_args_size> */
-  if (frame_size > -1)
+    /* when offset >= 512,
+       sub sp, sp, #<outgoing_args_size> */
+    if (frame_size > -1)
     {
-      if (crtl->outgoing_args_size > 0)
-	{
-	  insn = emit_insn (gen_add2_insn
-			    (stack_pointer_rtx,
-			     GEN_INT (- crtl->outgoing_args_size)));
-	  RTX_FRAME_RELATED_P (insn) = 1;
-	}
+        if (crtl->outgoing_args_size > 0)
+        {
+            insn = emit_insn (gen_add2_insn
+                    (stack_pointer_rtx,
+                     GEN_INT (- crtl->outgoing_args_size)));
+            RTX_FRAME_RELATED_P (insn) = 1;
+        }
     }
 }
 

@@ -442,11 +442,7 @@
    (use (match_operand 2 "" ""))
    (clobber (reg:DI LR_REGNUM))]
   ""
-  "
-  nop
-  blr\\t%0
-  nop
-  "
+  "blr\\t%0"
   [(set_attr "type" "call")]
 )
 
@@ -457,7 +453,11 @@
    (clobber (reg:DI LR_REGNUM))]
   "GET_CODE (operands[0]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[0])"
-  "bl\\t%a0"
+  "
+  nop
+  nop
+  bl\\t%a0
+  "
   [(set_attr "type" "call")]
 )
 
@@ -494,11 +494,7 @@
    (use (match_operand 3 "" ""))
    (clobber (reg:DI LR_REGNUM))]
   ""
-  "
-  nop
-  blr\\t%1
-  nop
-  "
+  "blr\\t%1"
   [(set_attr "type" "call")]
 
 )
@@ -511,7 +507,11 @@
    (clobber (reg:DI LR_REGNUM))]
   "GET_CODE (operands[1]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[1])"
-  "bl\\t%a1"
+  "
+  nop
+  nop
+  bl\\t%a1
+  "
   [(set_attr "type" "call")]
 )
 
@@ -901,6 +901,27 @@
   [(set_attr "type" "store2")]
 )
 
+;; Operands 0 and 2 are tied together by the final condition; so we allow
+;; fairly lax checking on the second memory operation.
+(define_insn "prologue_store_pair<mode>"
+  [(set (match_operand:GPI 0 "aarch64_mem_pair_operand" "=Ump")
+	(match_operand:GPI 1 "register_operand" "r"))
+   (set (match_operand:GPI 2 "memory_operand" "=m")
+        (match_operand:GPI 3 "register_operand" "r"))
+   (match_operand:GPI 4 "const_int_operand" "")]
+  "
+  INTVAL(operands[4]) == 1337 &&
+  rtx_equal_p (XEXP (operands[2], 0),
+		plus_constant (Pmode,
+			       XEXP (operands[0], 0),
+			       GET_MODE_SIZE (<MODE>mode)))"
+  "
+  nop
+  stp\\t%<w>1, %<w>3, %0
+  "
+  [(set_attr "type" "store2")]
+)
+
 ;; Operands 1 and 3 are tied together by the final condition; so we allow
 ;; fairly lax checking on the second memory operation.
 (define_insn "load_pair<mode>"
@@ -963,7 +984,33 @@
                    (match_operand:P 5 "const_int_operand" "n")))
           (match_operand:GPI 3 "register_operand" "r"))])]
   "INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
-  "stp\\t%<w>2, %<w>3, [%0, %4]!"
+  "
+  stp\\t%<w>2, %<w>3, [%0, %4]!
+  "
+  [(set_attr "type" "store2")]
+)
+
+;; Store pair with writeback.  This is primarily used in function prologues
+;; when saving [fp,lr]
+(define_insn "prologue_storewb_pair<GPI:mode>_<P:mode>"
+  [(parallel
+    [(set (match_operand:P 0 "register_operand" "=&k")
+          (plus:P (match_operand:P 1 "register_operand" "0")
+                  (match_operand:P 4 "const_int_operand" "n")))
+     (set (mem:GPI (plus:P (match_dup 0)
+                   (match_dup 4)))
+          (match_operand:GPI 2 "register_operand" "r"))
+     (set (mem:GPI (plus:P (match_dup 0)
+                   (match_operand:P 5 "const_int_operand" "n")))
+          (match_operand:GPI 3 "register_operand" "r"))
+     (match_operand:GPI 6 "const_int_operand" "")])]
+  "
+  INTVAL (operands[6]) == 1337 &&
+  INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
+  "
+  nop
+  stp\\t%<w>2, %<w>3, [%0, %4]!
+  "
   [(set_attr "type" "store2")]
 )
 
