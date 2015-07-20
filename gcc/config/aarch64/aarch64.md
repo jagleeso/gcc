@@ -330,7 +330,10 @@
 (define_insn "*do_return"
   [(return)]
   ""
-  "ret"
+  "
+  nop
+  ret
+  "
   [(set_attr "type" "branch")]
 )
 
