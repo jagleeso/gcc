@@ -684,6 +684,8 @@
    (set_attr "fp" "*,*,*,*,*,yes,*,yes,*,*,yes,yes,yes")]
 )
 
+;; CONFIG_RKP_HYPERDRIVE_ADRP_NP
+;; add nop before adrp's for symbols (not rodata constants though)
 (define_insn "*movdi_aarch64"
   [(set (match_operand:DI 0 "nonimmediate_operand" "=r,k,r,r,r,*w,m,  m,r,r,  *w, r,*w,w")
 	(match_operand:DI 1 "aarch64_mov_operand"  " r,r,k,N,m, m,rZ,*w,S,Ush,rZ,*w,*w,Dd"))]
@@ -699,7 +701,7 @@
    str\\t%x1, %0
    str\\t%d1, %0
    adr\\t%x0, %a1
-   adrp\\t%x0, %A1
+   * return \"nop; adrp\\t%x0, %A1\";
    fmov\\t%d0, %x1
    fmov\\t%x0, %d1
    fmov\\t%d0, %d1
