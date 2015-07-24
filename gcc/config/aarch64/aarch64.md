@@ -65,6 +65,12 @@
   ]
 )
 
+(define_constants
+  [
+    (MATCH_EPILOGUE		1338)
+  ]
+)
+
 (define_c_enum "unspec" [
     UNSPEC_CASESI
     UNSPEC_CLS
@@ -330,10 +336,7 @@
 (define_insn "*do_return"
   [(return)]
   ""
-  "
-  nop
-  ret
-  "
+  "ret"
   [(set_attr "type" "branch")]
 )
 
@@ -457,8 +460,6 @@
   "GET_CODE (operands[0]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[0])"
   "
-  nop
-  nop
   bl\\t%a0
   "
   [(set_attr "type" "call")]
@@ -511,8 +512,6 @@
   "GET_CODE (operands[1]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[1])"
   "
-  nop
-  nop
   bl\\t%a1
   "
   [(set_attr "type" "call")]
@@ -940,6 +939,28 @@
   [(set_attr "type" "neon_load1_2reg<q>")]
 )
 
+;; Operands 1 and 3 are tied together by the final condition; so we allow
+;; fairly lax checking on the second memory operation.
+(define_insn "epilogue_load_pair<mode>"
+  [(set (match_operand:GPI 0 "register_operand" "=r")
+	(match_operand:GPI 1 "aarch64_mem_pair_operand" "Ump"))
+   (set (match_operand:GPI 2 "register_operand" "=r")
+        (match_operand:GPI 3 "memory_operand" "m"))
+   (match_operand:GPI 4 "const_int_operand" "")]
+  "
+  INTVAL(operands[4]) == MATCH_EPILOGUE &&
+  rtx_equal_p (XEXP (operands[3], 0),
+		plus_constant (Pmode,
+			       XEXP (operands[1], 0),
+			       GET_MODE_SIZE (<MODE>mode)))
+  "
+  "
+  ldp\\t%<w>0, %<w>2, %1
+  nop
+  "
+  [(set_attr "type" "load2")]
+)
+
 ;; Operands 0 and 2 are tied together by the final condition; so we allow
 ;; fairly lax checking on the second memory operation.
 (define_insn "store_pair<mode>"
@@ -953,6 +974,30 @@
 			       GET_MODE_SIZE (<MODE>mode)))"
   "stp\\t%<w>1, %<w>3, %0"
   [(set_attr "type" "neon_store1_2reg<q>")]
+)
+
+;; Load pair with writeback.  This is primarily used in function epilogues
+;; when restoring [fp,lr]
+(define_insn "epilogue_loadwb_pair<GPI:mode>_<P:mode>"
+  [(parallel
+    [(set (match_operand:P 0 "register_operand" "=k")
+          (plus:P (match_operand:P 1 "register_operand" "0")
+                  (match_operand:P 4 "const_int_operand" "n")))
+     (set (match_operand:GPI 2 "register_operand" "=r")
+          (mem:GPI (plus:P (match_dup 1)
+                   (match_dup 4))))
+     (set (match_operand:GPI 3 "register_operand" "=r")
+          (mem:GPI (plus:P (match_dup 1)
+                   (match_operand:P 5 "const_int_operand" "n"))))
+     (match_operand:GPI 6 "const_int_operand" "")])]
+  "
+  INTVAL (operands[6]) == MATCH_EPILOGUE &&
+  INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
+  "
+  ldp\\t%<w>2, %<w>3, [%1], %4
+  nop
+  "
+  [(set_attr "type" "load2")]
 )
 
 ;; Load pair with writeback.  This is primarily used in function epilogues
