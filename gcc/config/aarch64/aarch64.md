@@ -460,6 +460,8 @@
   "GET_CODE (operands[0]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[0])"
   "
+  nop
+  nop
   bl\\t%a0
   "
   [(set_attr "type" "call")]
@@ -512,6 +514,8 @@
   "GET_CODE (operands[1]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[1])"
   "
+  nop
+  nop
   bl\\t%a1
   "
   [(set_attr "type" "call")]
