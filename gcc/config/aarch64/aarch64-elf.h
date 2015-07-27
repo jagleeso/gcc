@@ -21,6 +21,21 @@
 #ifndef GCC_AARCH64_ELF_H
 #define GCC_AARCH64_ELF_H
 
+/* Output 2 nops before the function label (i.e. before any of the function instructions).
+ */
+#define CONFIG_RKP_HYPERDRIVE_FUNCTION_LABEL_SPACERS
+
+#ifdef CONFIG_RKP_HYPERDRIVE_FUNCTION_LABEL_SPACERS
+#ifndef ASM_OUTPUT_FUNCTION_LABEL
+#define ASM_OUTPUT_FUNCTION_LABEL(FILE, NAME, DECL) \
+  do {						\
+    fputs ("nop\n", (FILE));			\
+    fputs ("nop\n", (FILE));			\
+    assemble_name ((FILE), (NAME));		\
+    fputs (":\n", (FILE));			\
+  } while (0)
+#endif
+#endif
 
 #define ASM_OUTPUT_LABELREF(FILE, NAME) \
   aarch64_asm_output_labelref (FILE, NAME)
