@@ -13456,6 +13456,7 @@ start_function (cp_decl_specifier_seq *declspecs,
   tree decl1;
 
   decl1 = grokdeclarator (declarator, declspecs, FUNCDEF, 1, &attrs);
+  invoke_plugin_callbacks (PLUGIN_START_PARSE_FUNCTION, decl1);
   if (decl1 == error_mark_node)
     return false;
   /* If the declarator is not suitable for a function definition,
@@ -14083,6 +14084,7 @@ finish_function (int flags)
       vec_free (deferred_mark_used_calls);
     }
 
+  invoke_plugin_callbacks (PLUGIN_FINISH_PARSE_FUNCTION, fndecl);
   return fndecl;
 }
 

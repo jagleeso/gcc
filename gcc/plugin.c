@@ -432,6 +432,8 @@ register_callback (const char *plugin_name,
 	    return;
 	  }
       /* Fall through.  */
+      case PLUGIN_START_PARSE_FUNCTION:
+      case PLUGIN_FINISH_PARSE_FUNCTION:
       case PLUGIN_FINISH_TYPE:
       case PLUGIN_FINISH_DECL:
       case PLUGIN_START_UNIT:
@@ -510,6 +512,8 @@ invoke_plugin_callbacks_full (int event, void *gcc_data)
 	gcc_assert (event >= PLUGIN_EVENT_FIRST_DYNAMIC);
 	gcc_assert (event < event_last);
       /* Fall through.  */
+      case PLUGIN_START_PARSE_FUNCTION:
+      case PLUGIN_FINISH_PARSE_FUNCTION:
       case PLUGIN_FINISH_TYPE:
       case PLUGIN_FINISH_DECL:
       case PLUGIN_START_UNIT:
