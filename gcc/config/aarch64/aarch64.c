@@ -70,6 +70,8 @@
  */
 #define MATCH_PROLOGUE 1337
 
+#define CONFIG_RKP_HYPERDRIVE_EPILOGUE_SPACER
+
 /* Defined for convenience.  */
 #define POINTER_BYTES (POINTER_SIZE / BITS_PER_UNIT)
 
@@ -2304,14 +2306,40 @@ aarch64_expand_epilogue (bool for_sibcall)
 						     stack_pointer_rtx,
 						     fp_offset
 						     + UNITS_PER_WORD));
+#if 0
+          /* Does not work =(.
+           */
+/* #ifdef CONFIG_RKP_HYPERDRIVE_EPILOGUE_SPACER */
+          insn = emit_insn(gen_nop());
+          gen_use(insn);
+#endif
+#ifdef CONFIG_RKP_HYPERDRIVE_EPILOGUE_SPACER
+	      insn = emit_insn (gen_epilogue_load_pairdi (hard_frame_pointer_rtx,
+						 mem_fp,
+						 gen_rtx_REG (DImode,
+							      LR_REGNUM),
+						 mem_lr,
+                         GEN_INT(MATCH_EPILOGUE)));
+#else
 	      insn = emit_insn (gen_load_pairdi (hard_frame_pointer_rtx,
 						 mem_fp,
 						 gen_rtx_REG (DImode,
 							      LR_REGNUM),
 						 mem_lr));
+#endif
 	    }
 	  else
 	    {
+#ifdef CONFIG_RKP_HYPERDRIVE_EPILOGUE_SPACER
+	      insn = emit_insn (gen_epilogue_loadwb_pairdi_di
+				(stack_pointer_rtx,
+				 stack_pointer_rtx,
+				 hard_frame_pointer_rtx,
+				 gen_rtx_REG (DImode, LR_REGNUM),
+				 GEN_INT (offset),
+				 GEN_INT (GET_MODE_SIZE (DImode) + offset),
+                 GEN_INT (MATCH_EPILOGUE)));
+#else
 	      insn = emit_insn (gen_loadwb_pairdi_di
 				(stack_pointer_rtx,
 				 stack_pointer_rtx,
@@ -2319,6 +2347,7 @@ aarch64_expand_epilogue (bool for_sibcall)
 				 gen_rtx_REG (DImode, LR_REGNUM),
 				 GEN_INT (offset),
 				 GEN_INT (GET_MODE_SIZE (DImode) + offset)));
+#endif
 	      RTX_FRAME_RELATED_P (XVECEXP (PATTERN (insn), 0, 2)) = 1;
 	      add_reg_note (insn, REG_CFA_ADJUST_CFA,
 			    (gen_rtx_SET (Pmode, stack_pointer_rtx,
