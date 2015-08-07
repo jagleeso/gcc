@@ -460,8 +460,6 @@
   "GET_CODE (operands[0]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[0])"
   "
-  nop
-  nop
   bl\\t%a0
   "
   [(set_attr "type" "call")]
@@ -514,8 +512,6 @@
   "GET_CODE (operands[1]) == SYMBOL_REF
    && !aarch64_is_long_call_p (operands[1])"
   "
-  nop
-  nop
   bl\\t%a1
   "
   [(set_attr "type" "call")]
@@ -923,6 +919,7 @@
 			       GET_MODE_SIZE (<MODE>mode)))"
   "
   nop
+  nop
   stp\\t%<w>1, %<w>3, %0
   "
   [(set_attr "type" "store2")]
@@ -1060,6 +1057,7 @@
   INTVAL (operands[6]) == 1337 &&
   INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
   "
+  nop
   nop
   stp\\t%<w>2, %<w>3, [%0, %4]!
   "
