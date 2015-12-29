@@ -31,7 +31,6 @@
   do {						\
     fputs ("nop\n", (FILE));			\
     fputs ("nop\n", (FILE));			\
-    fputs ("nop\n", (FILE));			\
     assemble_name ((FILE), (NAME));		\
     fputs (":\n", (FILE));			\
   } while (0)

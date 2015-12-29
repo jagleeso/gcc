@@ -919,7 +919,6 @@
 			       GET_MODE_SIZE (<MODE>mode)))"
   "
   nop
-  nop
   stp\\t%<w>1, %<w>3, %0
   "
   [(set_attr "type" "store2")]
@@ -1057,7 +1056,6 @@
   INTVAL (operands[6]) == 1337 &&
   INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
   "
-  nop
   nop
   stp\\t%<w>2, %<w>3, [%0, %4]!
   "
