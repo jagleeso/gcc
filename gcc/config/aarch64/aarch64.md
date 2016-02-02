@@ -448,7 +448,12 @@
    (use (match_operand 2 "" ""))
    (clobber (reg:DI LR_REGNUM))]
   ""
-  "blr\\t%0"
+  "
+  nop
+  nop
+  nop
+  blr\\t%0
+  "
   [(set_attr "type" "call")]
 )
 
@@ -498,7 +503,12 @@
    (use (match_operand 3 "" ""))
    (clobber (reg:DI LR_REGNUM))]
   ""
-  "blr\\t%1"
+  "
+  nop
+  nop
+  nop
+  blr\\t%1
+  "
   [(set_attr "type" "call")]
 
 )
