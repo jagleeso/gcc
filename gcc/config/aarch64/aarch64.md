@@ -452,6 +452,7 @@
   nop
   nop
   nop
+  nop
   blr\\t%0
   "
   [(set_attr "type" "call")]
@@ -504,6 +505,7 @@
    (clobber (reg:DI LR_REGNUM))]
   ""
   "
+  nop
   nop
   nop
   nop
