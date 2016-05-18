@@ -449,10 +449,6 @@
    (clobber (reg:DI LR_REGNUM))]
   ""
   "
-  nop
-  nop
-  nop
-  nop
   blr\\t%0
   "
   [(set_attr "type" "call")]
@@ -505,10 +501,6 @@
    (clobber (reg:DI LR_REGNUM))]
   ""
   "
-  nop
-  nop
-  nop
-  nop
   blr\\t%1
   "
   [(set_attr "type" "call")]
@@ -931,6 +923,7 @@
 			       GET_MODE_SIZE (<MODE>mode)))"
   "
   nop
+  nop
   stp\\t%<w>1, %<w>3, %0
   "
   [(set_attr "type" "store2")]
@@ -968,6 +961,7 @@
   "
   "
   ldp\\t%<w>0, %<w>2, %1
+  nop
   nop
   "
   [(set_attr "type" "load2")]
@@ -1007,6 +1001,7 @@
   INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
   "
   ldp\\t%<w>2, %<w>3, [%1], %4
+  nop
   nop
   "
   [(set_attr "type" "load2")]
@@ -1068,6 +1063,7 @@
   INTVAL (operands[6]) == 1337 &&
   INTVAL (operands[5]) == INTVAL (operands[4]) + GET_MODE_SIZE (<GPI:MODE>mode)"
   "
+  nop
   nop
   stp\\t%<w>2, %<w>3, [%0, %4]!
   "
